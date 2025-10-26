@@ -7,6 +7,7 @@ class Task {
   final bool completed;
   final String priority;
   final DateTime createdAt;
+  final DateTime? dueDate;
 
   Task({
     String? id,
@@ -15,8 +16,9 @@ class Task {
     this.completed = false,
     this.priority = 'medium',
     DateTime? createdAt,
-  })  : id = id ?? const Uuid().v4(),
-        createdAt = createdAt ?? DateTime.now();
+    this.dueDate,
+  }) : id = id ?? const Uuid().v4(),
+       createdAt = createdAt ?? DateTime.now();
 
   Map<String, dynamic> toMap() {
     return {
@@ -26,6 +28,7 @@ class Task {
       'completed': completed ? 1 : 0,
       'priority': priority,
       'createdAt': createdAt.toIso8601String(),
+      'dueDate': dueDate?.toIso8601String(),
     };
   }
 
@@ -37,6 +40,7 @@ class Task {
       completed: map['completed'] == 1,
       priority: map['priority'] ?? 'medium',
       createdAt: DateTime.parse(map['createdAt']),
+      dueDate: map['dueDate'] != null ? DateTime.parse(map['dueDate']) : null,
     );
   }
 
@@ -45,6 +49,7 @@ class Task {
     String? description,
     bool? completed,
     String? priority,
+    DateTime? dueDate,
   }) {
     return Task(
       id: id,
@@ -53,6 +58,29 @@ class Task {
       completed: completed ?? this.completed,
       priority: priority ?? this.priority,
       createdAt: createdAt,
+      dueDate: dueDate ?? this.dueDate,
     );
+  }
+
+  // Método para verificar se a tarefa está vencida
+  bool get isOverdue {
+    if (dueDate == null || completed) return false;
+    return DateTime.now().isAfter(dueDate!);
+  }
+
+  // Método para verificar se a tarefa vence hoje
+  bool get isDueToday {
+    if (dueDate == null) return false;
+    final now = DateTime.now();
+    final due = dueDate!;
+    return now.year == due.year && now.month == due.month && now.day == due.day;
+  }
+
+  // Método para verificar se a tarefa vence em breve (próximos 3 dias)
+  bool get isDueSoon {
+    if (dueDate == null || completed) return false;
+    final now = DateTime.now();
+    final difference = dueDate!.difference(now).inDays;
+    return difference >= 0 && difference <= 3;
   }
 }

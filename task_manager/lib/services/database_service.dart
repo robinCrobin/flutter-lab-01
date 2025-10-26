@@ -20,8 +20,9 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -33,9 +34,16 @@ class DatabaseService {
         description TEXT,
         completed INTEGER NOT NULL,
         priority TEXT NOT NULL,
-        createdAt TEXT NOT NULL
+        createdAt TEXT NOT NULL,
+        dueDate TEXT
       )
     ''');
+  }
+
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE tasks ADD COLUMN dueDate TEXT');
+    }
   }
 
   Future<Task> create(Task task) async {
@@ -46,11 +54,7 @@ class DatabaseService {
 
   Future<Task?> read(String id) async {
     final db = await database;
-    final maps = await db.query(
-      'tasks',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    final maps = await db.query('tasks', where: 'id = ?', whereArgs: [id]);
 
     if (maps.isNotEmpty) {
       return Task.fromMap(maps.first);
@@ -62,6 +66,54 @@ class DatabaseService {
     final db = await database;
     const orderBy = 'createdAt DESC';
     final result = await db.query('tasks', orderBy: orderBy);
+    return result.map((map) => Task.fromMap(map)).toList();
+  }
+
+  // Buscar tarefas ordenadas por data de vencimento
+  Future<List<Task>> readAllOrderedByDueDate() async {
+    final db = await database;
+    const orderBy = 'dueDate IS NULL, dueDate ASC, createdAt DESC';
+    final result = await db.query('tasks', orderBy: orderBy);
+    return result.map((map) => Task.fromMap(map)).toList();
+  }
+
+  // Buscar tarefas vencidas
+  Future<List<Task>> readOverdueTasks() async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    final result = await db.query(
+      'tasks',
+      where: 'dueDate IS NOT NULL AND dueDate < ? AND completed = 0',
+      whereArgs: [now],
+      orderBy: 'dueDate ASC',
+    );
+    return result.map((map) => Task.fromMap(map)).toList();
+  }
+
+  // Buscar tarefas que vencem hoje
+  Future<List<Task>> readTasksDueToday() async {
+    final db = await database;
+    final today = DateTime.now();
+    final startOfDay = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    ).toIso8601String();
+    final endOfDay = DateTime(
+      today.year,
+      today.month,
+      today.day,
+      23,
+      59,
+      59,
+    ).toIso8601String();
+
+    final result = await db.query(
+      'tasks',
+      where: 'dueDate >= ? AND dueDate <= ? AND completed = 0',
+      whereArgs: [startOfDay, endOfDay],
+      orderBy: 'dueDate ASC',
+    );
     return result.map((map) => Task.fromMap(map)).toList();
   }
 
@@ -77,10 +129,6 @@ class DatabaseService {
 
   Future<int> delete(String id) async {
     final db = await database;
-    return await db.delete(
-      'tasks',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
   }
 }
