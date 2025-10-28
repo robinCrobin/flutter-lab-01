@@ -1,7 +1,7 @@
 import 'package:uuid/uuid.dart';
 
 class Task {
-  final String id;
+  final int? id;
   final String title;
   final String description;
   final bool completed;
@@ -22,7 +22,7 @@ class Task {
   final String? locationName;
 
   Task({
-    String ? id,
+    this.id,
     required this.title,
     required this.description,
     required this.priority,
@@ -35,7 +35,7 @@ class Task {
     this.longitude,
     this.locationName,
     this.dueDate,
-  }) : id = id ?? const Uuid().v4(),
+  }) :
        createdAt = createdAt ?? DateTime.now();
 
   // Getters auxiliares
@@ -63,14 +63,13 @@ class Task {
 
   factory Task.fromMap(Map<String, dynamic> map) {
     return Task(
-      id: map['id'],
-      title: map['title'],
-      description: map['description'] ?? '',
-      completed: map['completed'] == 1,
-      priority: map['priority'] ?? 'medium',
-      createdAt: DateTime.parse(map['createdAt']),
-      dueDate: map['dueDate'] != null ? DateTime.parse(map['dueDate']) : null,
-       photoPath: map['photoPath'] as String?,
+      id: map['id'] as int?,
+      title: map['title'] as String,
+      description: map['description'] as String,
+      priority: map['priority'] as String,
+      completed: (map['completed'] as int) == 1,
+      createdAt: DateTime.parse(map['createdAt'] as String),
+      photoPath: map['photoPath'] as String?,
       completedAt: map['completedAt'] != null 
           ? DateTime.parse(map['completedAt'] as String)
           : null,
@@ -78,10 +77,12 @@ class Task {
       latitude: map['latitude'] as double?,
       longitude: map['longitude'] as double?,
       locationName: map['locationName'] as String?,
+      dueDate: map['dueDate'] != null ? DateTime.parse(map['dueDate']) : null,
     );
   }
 
   Task copyWith({
+    int? id,
     String? title,
     String? description,
     bool? completed,
@@ -96,7 +97,7 @@ class Task {
     String? locationName,
   }) {
     return Task(
-      id: id,
+      id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
       completed: completed ?? this.completed,
