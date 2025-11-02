@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../screens/camera_screen.dart';
@@ -14,7 +15,9 @@ class CameraService {
   Future<void> initialize() async {
     try {
       _cameras = await availableCameras();
-      print('✅ CameraService: ${_cameras?.length ?? 0} câmera(s) encontrada(s)');
+      print(
+        '✅ CameraService: ${_cameras?.length ?? 0} câmera(s) encontrada(s)',
+      );
     } catch (e) {
       print('⚠️ Erro ao inicializar câmera: $e');
       _cameras = [];
@@ -45,7 +48,7 @@ class CameraService {
       await controller.initialize();
 
       if (!context.mounted) return null;
-      
+
       final imagePath = await Navigator.push<String>(
         context,
         MaterialPageRoute(
@@ -57,7 +60,7 @@ class CameraService {
       return imagePath;
     } catch (e) {
       print('❌ Erro ao abrir câmera: $e');
-      
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -66,7 +69,7 @@ class CameraService {
           ),
         );
       }
-      
+
       return null;
     } finally {
       controller.dispose();
@@ -78,12 +81,12 @@ class CameraService {
       final appDir = await getApplicationDocumentsDirectory();
       final fileName = 'task_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final savePath = path.join(appDir.path, 'images', fileName);
-      
+
       final imageDir = Directory(path.join(appDir.path, 'images'));
       if (!await imageDir.exists()) {
         await imageDir.create(recursive: true);
       }
-      
+
       final savedImage = await File(image.path).copy(savePath);
       print('✅ Foto salva: ${savedImage.path}');
       return savedImage.path;
@@ -105,5 +108,183 @@ class CameraService {
       print('❌ Erro ao deletar foto: $e');
       return false;
     }
+  }
+
+  // NOVOS MÉTODOS PARA GALERIA
+  Future<String?> pickImageFromGallery(BuildContext context) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        final savedPath = await savePicture(image);
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('📷 Imagem selecionada da galeria!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+
+        return savedPath;
+      }
+
+      return null;
+    } catch (e) {
+      print('❌ Erro ao selecionar da galeria: $e');
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao selecionar imagem: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+
+      return null;
+    }
+  }
+
+  Future<String?> showImageSourceDialog(BuildContext context) async {
+    return await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Selecionar Foto',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+
+                const SizedBox(height: 20),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final imagePath = await takePicture(context);
+                          if (imagePath != null && context.mounted) {
+                            Navigator.pop(context, imagePath);
+                          } else {
+                            Navigator.pop(context);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.blue, width: 2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(
+                                Icons.camera_alt,
+                                size: 48,
+                                color: Colors.blue,
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Câmera',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Tirar foto',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 16),
+
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final imagePath = await pickImageFromGallery(context);
+                          if (imagePath != null && context.mounted) {
+                            Navigator.pop(context, imagePath);
+                          } else {
+                            Navigator.pop(context);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.green, width: 2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(
+                                Icons.photo_library,
+                                size: 48,
+                                color: Colors.green,
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Galeria',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Escolher foto',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }

@@ -1,40 +1,37 @@
 import 'package:flutter/material.dart';
+import 'services/camera_service.dart';
 import 'screens/task_list_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializar câmera
+  await CameraService.instance.initialize();
+
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Task Manager Pro',
       debugShowCheckedModeBanner: false,
-      
-      // Tema Claro
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.blue,
           brightness: Brightness.light,
         ),
         useMaterial3: true,
-      ),
-      
-      // Tema Escuro
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.dark,
+        cardTheme: const CardThemeData(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
         ),
-        useMaterial3: true,
       ),
-      
-      // Seguir configuração do sistema
-      themeMode: ThemeMode.system,
-      
       home: const TaskListScreen(),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:io';
 import '../models/task.dart';
 
 class TaskCard extends StatelessWidget {
@@ -241,6 +242,114 @@ class TaskCard extends StatelessWidget {
                             ),
                           ),
 
+                        // Photo Badge (Lab 3)
+                        if (task.hasPhoto)
+                          GestureDetector(
+                            onTap: () => _showPhotoPreview(context),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: Colors.blue.withOpacity(0.1),
+                                border: Border.all(
+                                  color: Colors.blue,
+                                  width: 1,
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.photo_camera,
+                                    size: 14,
+                                    color: Colors.blue,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Foto',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                        // Location Badge (Lab 3)
+                        if (task.hasLocation)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.green.withOpacity(0.1),
+                              border: Border.all(color: Colors.green, width: 1),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 14,
+                                  color: Colors.green,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  task.locationName ?? 'Localização',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        // Shake Completion Badge (Lab 3)
+                        if (task.wasCompletedByShake)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.purple.withOpacity(0.1),
+                              border: Border.all(
+                                color: Colors.purple,
+                                width: 1,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.vibration,
+                                  size: 14,
+                                  color: Colors.purple,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Shake',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.purple,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
                         // Data de Criação (menor)
                         Row(
                           mainAxisSize: MainAxisSize.min,
@@ -279,6 +388,104 @@ class TaskCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  // Lab 3 - Photo Preview Method
+  void _showPhotoPreview(BuildContext context) {
+    if (task.photoPath == null) return;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+              maxWidth: MediaQuery.of(context).size.width * 0.9,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header with title and close button
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12),
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          task.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                // Photo
+                Flexible(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(12),
+                        bottomRight: Radius.circular(12),
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(12),
+                        bottomRight: Radius.circular(12),
+                      ),
+                      child: Image.file(
+                        File(task.photoPath!),
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            padding: const EdgeInsets.all(32),
+                            child: const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  color: Colors.white,
+                                  size: 48,
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  'Erro ao carregar a imagem',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

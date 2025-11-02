@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/task.dart';
 import '../services/database_service.dart';
+import '../services/sensor_service.dart';
+import '../services/location_service.dart';
+import '../screens/task_form_screen.dart';
 import '../widgets/task_card.dart';
-import 'task_form_screen.dart';
+import '../services/camera_service.dart';
 
 class TaskListScreen extends StatefulWidget {
   const TaskListScreen({super.key});
@@ -14,85 +17,198 @@ class TaskListScreen extends StatefulWidget {
 class _TaskListScreenState extends State<TaskListScreen> {
   List<Task> _tasks = [];
   String _filter = 'all'; // all, completed, pending, overdue
-  String _sortBy = 'created'; // created, dueDate, priority
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _loadTasks();
+    _setupShakeDetection(); // INICIAR SHAKE
+  }
+
+  @override
+  void dispose() {
+    SensorService.instance.stop(); // PARAR SHAKE
+    super.dispose();
+  }
+
+  // SHAKE DETECTION
+  void _setupShakeDetection() {
+    SensorService.instance.startShakeDetection(() {
+      _showShakeDialog();
+    });
+  }
+
+  void _showShakeDialog() {
+    final pendingTasks = _tasks.where((t) => !t.completed).toList();
+
+    if (pendingTasks.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🎉 Nenhuma tarefa pendente!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.vibration, color: Colors.blue),
+            SizedBox(width: 8),
+            Expanded(child: Text('Shake detectado!')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Selecione uma tarefa para completar:'),
+            const SizedBox(height: 16),
+            ...pendingTasks
+                .take(3)
+                .map(
+                  (task) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      task.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.check_circle, color: Colors.green),
+                      onPressed: () => _completeTaskByShake(task),
+                    ),
+                  ),
+                ),
+            if (pendingTasks.length > 3)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  '+ ${pendingTasks.length - 3} outras',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _completeTaskByShake(Task task) async {
+    try {
+      final updated = task.copyWith(
+        completed: true,
+        completedAt: DateTime.now(),
+        completedBy: 'shake',
+      );
+
+      await DatabaseService.instance.update(updated);
+      Navigator.pop(context);
+      await _loadTasks();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ "${task.title}" completa via shake!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _loadTasks() async {
     setState(() => _isLoading = true);
-    final tasks = await DatabaseService.instance.readAll();
-    setState(() {
-      _tasks = tasks;
-      _isLoading = false;
-    });
+
+    try {
+      final tasks = await DatabaseService.instance.readAll();
+
+      if (mounted) {
+        setState(() {
+          _tasks = tasks;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao carregar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   String _searchQuery = '';
 
   List<Task> get _filteredTasks {
-    var tasks = _tasks;
+    List<Task> filtered = [];
 
-    // Filtro por status
     switch (_filter) {
-      case 'completed':
-        tasks = tasks.where((t) => t.completed).toList();
-        break;
       case 'pending':
-        tasks = tasks.where((t) => !t.completed).toList();
+        filtered = _tasks.where((t) => !t.completed).toList();
+        break;
+      case 'completed':
+        filtered = _tasks.where((t) => t.completed).toList();
         break;
       case 'overdue':
-        tasks = tasks.where((t) => t.isOverdue).toList();
+        filtered = _tasks.where((t) => t.isOverdue).toList();
         break;
-    }
-
-    // Filtro por busca
-    if (_searchQuery.isNotEmpty) {
-      tasks = tasks.where((t) {
-        return t.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            t.description.toLowerCase().contains(_searchQuery.toLowerCase());
-      }).toList();
-    }
-
-    // Ordenação
-    switch (_sortBy) {
-      case 'dueDate':
-        tasks.sort((a, b) {
-          // Tarefas sem data de vencimento vão para o final
-          if (a.dueDate == null && b.dueDate == null) {
-            return b.createdAt.compareTo(a.createdAt);
-          }
-          if (a.dueDate == null) return 1;
-          if (b.dueDate == null) return -1;
-
-          // Ordenar por data de vencimento (mais próximas primeiro)
-          final comparison = a.dueDate!.compareTo(b.dueDate!);
-          return comparison != 0
-              ? comparison
-              : b.createdAt.compareTo(a.createdAt);
-        });
+      case 'nearby':
+        filtered = _tasks; // This will be populated by _filterByNearby
         break;
-      case 'priority':
-        final priorityOrder = {'urgent': 0, 'high': 1, 'medium': 2, 'low': 3};
-        tasks.sort((a, b) {
-          final orderA = priorityOrder[a.priority] ?? 2;
-          final orderB = priorityOrder[b.priority] ?? 2;
-          final comparison = orderA.compareTo(orderB);
-          return comparison != 0
-              ? comparison
-              : b.createdAt.compareTo(a.createdAt);
-        });
-        break;
-      case 'created':
       default:
-        tasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        filtered = _tasks;
     }
 
-    return tasks;
+    // Apply search filter if there's a search query
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered
+          .where(
+            (task) =>
+                task.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                task.description.toLowerCase().contains(
+                  _searchQuery.toLowerCase(),
+                ),
+          )
+          .toList();
+    }
+
+    return filtered;
+  }
+
+  Map<String, int> get _statistics {
+    final total = _tasks.length;
+    final completed = _tasks.where((t) => t.completed).length;
+    final pending = total - completed;
+    final completionRate = total > 0 ? ((completed / total) * 100).round() : 0;
+
+    return {
+      'total': total,
+      'completed': completed,
+      'pending': pending,
+      'completionRate': completionRate,
+    };
   }
 
   Future<void> _toggleTask(Task task) async {
@@ -101,13 +217,48 @@ class _TaskListScreenState extends State<TaskListScreen> {
     await _loadTasks();
   }
 
+  Future<void> _filterByNearby() async {
+    final position = await LocationService.instance.getCurrentLocation();
+
+    if (position == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Não foi possível obter localização'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    final nearbyTasks = await DatabaseService.instance.getTasksNearLocation(
+      latitude: position.latitude,
+      longitude: position.longitude,
+      radiusInMeters: 1000,
+    );
+
+    setState(() {
+      _tasks = nearbyTasks;
+      _filter = 'nearby';
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('📍 ${nearbyTasks.length} tarefa(s) próxima(s)'),
+          backgroundColor: Colors.blue,
+        ),
+      );
+    }
+  }
+
   Future<void> _deleteTask(Task task) async {
-    // Confirmar exclusão
-    final confirmed = await showDialog<bool>(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmar exclusão'),
-        content: Text('Deseja realmente excluir "${task.title}"?'),
+        content: Text('Deseja deletar "${task.title}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -116,23 +267,35 @@ class _TaskListScreenState extends State<TaskListScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Excluir'),
+            child: const Text('Deletar'),
           ),
         ],
       ),
     );
 
-    if (confirmed == true) {
-      await DatabaseService.instance.delete(task.id);
-      await _loadTasks();
+    if (confirm == true) {
+      try {
+        if (task.hasPhoto) {
+          await CameraService.instance.deletePhoto(task.photoPath!);
+        }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Tarefa excluída'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        await DatabaseService.instance.delete(task.id!);
+        await _loadTasks();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🗑️ Tarefa deletada'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+          );
+        }
       }
     }
   }
@@ -150,8 +313,8 @@ class _TaskListScreenState extends State<TaskListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final stats = _statistics;
     final filteredTasks = _filteredTasks;
-    final stats = _calculateStats();
 
     return Scaffold(
       appBar: AppBar(
@@ -160,55 +323,24 @@ class _TaskListScreenState extends State<TaskListScreen> {
         foregroundColor: Colors.white,
         elevation: 2,
         actions: [
-          // Menu de Ordenação
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.sort),
-            onSelected: (value) => setState(() => _sortBy = value),
-            tooltip: 'Ordenar tarefas',
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'created',
-                child: Row(
-                  children: [
-                    Icon(Icons.access_time),
-                    SizedBox(width: 8),
-                    Text('Data de Criação'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'dueDate',
-                child: Row(
-                  children: [
-                    Icon(Icons.schedule),
-                    SizedBox(width: 8),
-                    Text('Data de Vencimento'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'priority',
-                child: Row(
-                  children: [
-                    Icon(Icons.flag),
-                    SizedBox(width: 8),
-                    Text('Prioridade'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          // Filtro
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list),
-            onSelected: (value) => setState(() => _filter = value),
-            tooltip: 'Filtrar tarefas',
+            onSelected: (value) {
+              if (value == 'nearby') {
+                _filterByNearby();
+              } else {
+                setState(() {
+                  _filter = value;
+                  if (value != 'nearby') _loadTasks();
+                });
+              }
+            },
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: 'all',
                 child: Row(
                   children: [
-                    Icon(Icons.list),
+                    Icon(Icons.list_alt),
                     SizedBox(width: 8),
                     Text('Todas'),
                   ],
@@ -218,7 +350,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
                 value: 'pending',
                 child: Row(
                   children: [
-                    Icon(Icons.pending_actions),
+                    Icon(Icons.pending_outlined),
                     SizedBox(width: 8),
                     Text('Pendentes'),
                   ],
@@ -228,23 +360,55 @@ class _TaskListScreenState extends State<TaskListScreen> {
                 value: 'completed',
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle),
+                    Icon(Icons.check_circle_outline),
                     SizedBox(width: 8),
                     Text('Concluídas'),
                   ],
                 ),
               ),
               const PopupMenuItem(
-                value: 'overdue',
+                value: 'nearby',
                 child: Row(
                   children: [
-                    Icon(Icons.warning, color: Colors.red),
+                    Icon(Icons.near_me),
                     SizedBox(width: 8),
-                    Text('Vencidas'),
+                    Text('Próximas'),
                   ],
                 ),
               ),
             ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('💡 Dicas'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text('• Toque no card para editar'),
+                      SizedBox(height: 8),
+                      Text('• Marque como completa com checkbox'),
+                      SizedBox(height: 8),
+                      Text('• Sacuda o celular para completar rápido!'),
+                      SizedBox(height: 8),
+                      Text('• Use filtros para organizar'),
+                      SizedBox(height: 8),
+                      Text('• Adicione fotos e localização'),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Entendi'),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -469,14 +633,6 @@ class _TaskListScreenState extends State<TaskListScreen> {
         ],
       ),
     );
-  }
-
-  Map<String, int> _calculateStats() {
-    return {
-      'total': _tasks.length,
-      'completed': _tasks.where((t) => t.completed).length,
-      'pending': _tasks.where((t) => !t.completed).length,
-    };
   }
 
   int _getOverdueCount() {

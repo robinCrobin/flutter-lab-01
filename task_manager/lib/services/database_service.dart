@@ -21,7 +21,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 4,  // VERSÃO FINAL COM TODOS OS CAMPOS
+      version: 4, // VERSÃO FINAL COM TODOS OS CAMPOS
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -45,7 +45,7 @@ class DatabaseService {
         completedBy TEXT,
         latitude REAL,
         longitude REAL,
-        locationName TEXT
+        locationName TEXT,
         dueDate TEXT
       )
     ''');
@@ -68,7 +68,7 @@ class DatabaseService {
     print('✅ Banco migrado de v$oldVersion para v$newVersion');
   }
 
-   // CRUD Methods
+  // CRUD Methods
   Future<Task> create(Task task) async {
     final db = await instance.database;
     final id = await db.insert('tasks', task.toMap());
@@ -77,11 +77,7 @@ class DatabaseService {
 
   Future<Task?> read(int id) async {
     final db = await instance.database;
-    final maps = await db.query(
-      'tasks',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    final maps = await db.query('tasks', where: 'id = ?', whereArgs: [id]);
 
     if (maps.isNotEmpty) {
       return Task.fromMap(maps.first);
@@ -95,7 +91,7 @@ class DatabaseService {
     final result = await db.query('tasks', orderBy: orderBy);
     return result.map((map) => Task.fromMap(map)).toList();
   }
-  
+
   Future<int> update(Task task) async {
     final db = await instance.database;
     return db.update(
@@ -108,11 +104,7 @@ class DatabaseService {
 
   Future<int> delete(int id) async {
     final db = await instance.database;
-    return await db.delete(
-      'tasks',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
   }
 
   // Buscar tarefas ordenadas por data de vencimento
@@ -162,6 +154,7 @@ class DatabaseService {
     );
     return result.map((map) => Task.fromMap(map)).toList();
   }
+
   // Método especial: buscar tarefas por proximidade
   Future<List<Task>> getTasksNearLocation({
     required double latitude,
@@ -169,15 +162,15 @@ class DatabaseService {
     double radiusInMeters = 1000,
   }) async {
     final allTasks = await readAll();
-    
+
     return allTasks.where((task) {
       if (!task.hasLocation) return false;
-      
+
       // Cálculo de distância usando fórmula de Haversine (simplificada)
       final latDiff = (task.latitude! - latitude).abs();
       final lonDiff = (task.longitude! - longitude).abs();
       final distance = ((latDiff * 111000) + (lonDiff * 111000)) / 2;
-      
+
       return distance <= radiusInMeters;
     }).toList();
   }

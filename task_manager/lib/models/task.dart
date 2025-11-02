@@ -1,5 +1,3 @@
-import 'package:uuid/uuid.dart';
-
 class Task {
   final int? id;
   final String title;
@@ -11,11 +9,11 @@ class Task {
 
   // CÂMERA
   final String? photoPath;
-  
+
   // SENSORES
   final DateTime? completedAt;
-  final String? completedBy;      // 'manual', 'shake'
-  
+  final String? completedBy; // 'manual', 'shake'
+
   // GPS
   final double? latitude;
   final double? longitude;
@@ -35,8 +33,7 @@ class Task {
     this.longitude,
     this.locationName,
     this.dueDate,
-  }) :
-       createdAt = createdAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now();
 
   // Getters auxiliares
   bool get hasPhoto => photoPath != null && photoPath!.isNotEmpty;
@@ -70,7 +67,7 @@ class Task {
       completed: (map['completed'] as int) == 1,
       createdAt: DateTime.parse(map['createdAt'] as String),
       photoPath: map['photoPath'] as String?,
-      completedAt: map['completedAt'] != null 
+      completedAt: map['completedAt'] != null
           ? DateTime.parse(map['completedAt'] as String)
           : null,
       completedBy: map['completedBy'] as String?,
