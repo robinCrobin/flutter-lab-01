@@ -7,8 +7,9 @@ class Task {
   final DateTime createdAt;
   final DateTime? dueDate;
 
-  // CÂMERA
-  final String? photoPath;
+  // CÂMERA - Múltiplas fotos
+  final String? photoPath; // Mantido para compatibilidade
+  final List<String>? photoPaths; // Nova lista de fotos
 
   // SENSORES
   final DateTime? completedAt;
@@ -27,6 +28,7 @@ class Task {
     this.completed = false,
     DateTime? createdAt,
     this.photoPath,
+    this.photoPaths,
     this.completedAt,
     this.completedBy,
     this.latitude,
@@ -36,7 +38,16 @@ class Task {
   }) : createdAt = createdAt ?? DateTime.now();
 
   // Getters auxiliares
-  bool get hasPhoto => photoPath != null && photoPath!.isNotEmpty;
+  bool get hasPhoto => (photoPath != null && photoPath!.isNotEmpty) || 
+                       (photoPaths != null && photoPaths!.isNotEmpty);
+  bool get hasMultiplePhotos => photoPaths != null && photoPaths!.length > 1;
+  int get photoCount => photoPaths?.length ?? (hasPhoto ? 1 : 0);
+  List<String> get allPhotoPaths {
+    List<String> paths = [];
+    if (photoPath != null && photoPath!.isNotEmpty) paths.add(photoPath!);
+    if (photoPaths != null) paths.addAll(photoPaths!);
+    return paths.toSet().toList(); // Remove duplicatas
+  }
   bool get hasLocation => latitude != null && longitude != null;
   bool get wasCompletedByShake => completedBy == 'shake';
 
@@ -50,6 +61,7 @@ class Task {
       'createdAt': createdAt.toIso8601String(),
       'dueDate': dueDate?.toIso8601String(),
       'photoPath': photoPath,
+      'photoPaths': photoPaths?.join(','), // Salva como string separada por vírgulas
       'completedAt': completedAt?.toIso8601String(),
       'completedBy': completedBy,
       'latitude': latitude,
@@ -67,6 +79,9 @@ class Task {
       completed: (map['completed'] as int) == 1,
       createdAt: DateTime.parse(map['createdAt'] as String),
       photoPath: map['photoPath'] as String?,
+      photoPaths: map['photoPaths'] != null 
+          ? (map['photoPaths'] as String).split(',').where((path) => path.isNotEmpty).toList()
+          : null,
       completedAt: map['completedAt'] != null
           ? DateTime.parse(map['completedAt'] as String)
           : null,
@@ -87,6 +102,7 @@ class Task {
     DateTime? dueDate,
     DateTime? createdAt,
     String? photoPath,
+    List<String>? photoPaths,
     DateTime? completedAt,
     String? completedBy,
     double? latitude,
@@ -102,6 +118,7 @@ class Task {
       createdAt: createdAt,
       dueDate: dueDate ?? this.dueDate,
       photoPath: photoPath ?? this.photoPath,
+      photoPaths: photoPaths ?? this.photoPaths,
       completedAt: completedAt ?? this.completedAt,
       completedBy: completedBy ?? this.completedBy,
       latitude: latitude ?? this.latitude,

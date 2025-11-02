@@ -1,10 +1,11 @@
-import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../models/task.dart';
 import '../services/database_service.dart';
 import '../services/camera_service.dart';
 import '../services/location_service.dart';
 import '../widgets/location_picker.dart';
+import '../widgets/photo_gallery_widget.dart';
 
 class TaskFormScreen extends StatefulWidget {
   final Task? task; // null = criar novo, não-null = editar
@@ -25,8 +26,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   bool _isLoading = false;
   DateTime? _dueDate;
 
-  // CÂMERA
+  // CÂMERA - Múltiplas fotos
   String? _photoPath;
+  List<String> _photoPaths = [];
 
   // GPS
   double? _latitude;
@@ -45,6 +47,17 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       _completed = widget.task!.completed;
       _dueDate = widget.task!.dueDate;
       _photoPath = widget.task!.photoPath;
+      _photoPaths = List<String>.from(widget.task!.photoPaths ?? []);
+      
+      // Ensure backward compatibility: if we have photoPath but no photoPaths, add it
+      if (_photoPath != null && _photoPaths.isEmpty) {
+        _photoPaths.add(_photoPath!);
+      }
+      
+      // Ensure photoPath is synced with photoPaths for backward compatibility
+      if (_photoPaths.isNotEmpty && _photoPath == null) {
+        _photoPath = _photoPaths.first;
+      }
       _latitude = widget.task!.latitude;
       _longitude = widget.task!.longitude;
       _locationName = widget.task!.locationName;
@@ -58,42 +71,57 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     super.dispose();
   }
 
-  // CÂMERA E GALERIA METHODS
-  Future<void> _selectImage() async {
-    final photoPath = await CameraService.instance.showImageSourceDialog(
-      context,
-    );
+  // CÂMERA E GALERIA METHODS - Múltiplas fotos
+  Future<void> _selectImages() async {
+    final result = await CameraService.instance.showMultiImageSourceDialog(context);
 
-    if (photoPath != null && mounted) {
-      setState(() => _photoPath = photoPath);
+    if (result != null && mounted) {
+      if (result.startsWith('single:')) {
+        // Uma única foto
+        final photoPath = result.substring(7);
+        setState(() {
+          _photoPaths.add(photoPath);
+          // Manter compatibilidade com photoPath único para exibição
+          if (_photoPath == null) _photoPath = photoPath;
+        });
+      } else if (result.startsWith('multiple:')) {
+        // Múltiplas fotos
+        final photoPaths = result.substring(9).split(',');
+        setState(() {
+          _photoPaths.addAll(photoPaths);
+          // Manter compatibilidade com photoPath único
+          if (_photoPath == null && photoPaths.isNotEmpty) {
+            _photoPath = photoPaths.first;
+          }
+        });
+      }
     }
   }
 
-  void _removePhoto() {
-    setState(() => _photoPath = null);
+  void _removePhoto(int index) {
+    setState(() {
+      if (index < _photoPaths.length) {
+        _photoPaths.removeAt(index);
+      }
+      // Update single photo path for backward compatibility
+      _photoPath = _photoPaths.isNotEmpty ? _photoPaths.first : null;
+    });
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('🗑️ Foto removida')));
   }
 
-  void _viewPhoto() {
-    if (_photoPath == null) return;
-
-    Navigator.push(
+  void _removeAllPhotos() {
+    setState(() {
+      _photoPaths.clear();
+      _photoPath = null;
+    });
+    ScaffoldMessenger.of(
       context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
-          body: Center(
-            child: InteractiveViewer(
-              child: Image.file(File(_photoPath!), fit: BoxFit.contain),
-            ),
-          ),
-        ),
-      ),
-    );
+    ).showSnackBar(const SnackBar(content: Text('🗑️ Todas as fotos removidas')));
   }
+
+
 
   // GPS METHODS
   void _showLocationPicker() {
@@ -151,6 +179,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           completed: _completed,
           dueDate: _dueDate,
           photoPath: _photoPath,
+          photoPaths: _photoPaths,
           latitude: _latitude,
           longitude: _longitude,
           locationName: _locationName,
@@ -175,6 +204,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           completed: _completed,
           dueDate: _dueDate,
           photoPath: _photoPath,
+          photoPaths: _photoPaths,
           latitude: _latitude,
           longitude: _longitude,
           locationName: _locationName,
@@ -462,24 +492,26 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
                     const Divider(height: 32),
 
-                    // SEÇÃO FOTO
+                    // SEÇÃO MÚLTIPLAS FOTOS
                     Row(
                       children: [
-                        const Icon(Icons.photo_camera, color: Colors.blue),
+                        const Icon(Icons.photo_library, color: Colors.blue),
                         const SizedBox(width: 8),
-                        const Text(
-                          'Foto',
-                          style: TextStyle(
+                        Text(
+                          _photoPaths.isEmpty 
+                            ? 'Fotos'
+                            : 'Fotos (${_photoPaths.length})',
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const Spacer(),
-                        if (_photoPath != null)
+                        if (_photoPaths.isNotEmpty)
                           TextButton.icon(
-                            onPressed: _removePhoto,
+                            onPressed: _removeAllPhotos,
                             icon: const Icon(Icons.delete_outline, size: 18),
-                            label: const Text('Remover'),
+                            label: const Text('Remover todas'),
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.red,
                             ),
@@ -489,40 +521,39 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
                     const SizedBox(height: 12),
 
-                    if (_photoPath != null)
-                      GestureDetector(
-                        onTap: _viewPhoto,
-                        child: Container(
-                          height: 200,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(
-                              File(_photoPath!),
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
+                    if (_photoPaths.isNotEmpty)
+                      PhotoGalleryWidget(
+                        photoPaths: _photoPaths,
+                        onPhotoTap: (index) {
+                          // Visualização em tela cheia será tratada pelo widget
+                        },
+                        onPhotoDelete: (index) {
+                          _removePhoto(index);
+                        },
+                        maxHeight: 200,
+                        showDeleteButton: true,
                       )
                     else
                       OutlinedButton.icon(
-                        onPressed: _selectImage,
+                        onPressed: _selectImages,
                         icon: const Icon(Icons.add_a_photo),
-                        label: const Text('Adicionar Foto'),
+                        label: const Text('Adicionar Fotos'),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.all(16),
                         ),
                       ),
+
+                    if (_photoPaths.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _selectImages,
+                        icon: const Icon(Icons.add_a_photo),
+                        label: const Text('Adicionar mais fotos'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                    ],
 
                     const Divider(height: 32),
 

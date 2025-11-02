@@ -287,4 +287,194 @@ class CameraService {
       },
     );
   }
+
+  // NOVOS MÉTODOS PARA MÚLTIPLAS FOTOS
+  Future<List<String>?> pickMultipleImagesFromGallery(BuildContext context) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final List<XFile> images = await picker.pickMultiImage(
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (images.isNotEmpty) {
+        List<String> savedPaths = [];
+        
+        for (XFile image in images) {
+          final savedPath = await savePicture(image);
+          savedPaths.add(savedPath);
+        }
+        
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('📷 ${images.length} imagens selecionadas!'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        
+        return savedPaths;
+      }
+      
+      return null;
+    } catch (e) {
+      print('❌ Erro ao selecionar múltiplas imagens: $e');
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao selecionar imagens: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      
+      return null;
+    }
+  }
+
+  Future<String?> showMultiImageSourceDialog(BuildContext context) async {
+    return await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Adicionar Fotos',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Primeira linha: Câmera e Galeria (única)
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final imagePath = await takePicture(context);
+                          if (imagePath != null) {
+                            Navigator.pop(context, 'single:$imagePath');
+                          } else {
+                            Navigator.pop(context);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.blue, width: 2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.camera_alt, size: 40, color: Colors.blue),
+                              SizedBox(height: 8),
+                              Text('Câmera', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blue)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    
+                    const SizedBox(width: 12),
+                    
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final imagePath = await pickImageFromGallery(context);
+                          if (imagePath != null) {
+                            Navigator.pop(context, 'single:$imagePath');
+                          } else {
+                            Navigator.pop(context);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.green, width: 2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.photo, size: 40, color: Colors.green),
+                              SizedBox(height: 8),
+                              Text('1 Foto', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Segunda linha: Múltiplas fotos
+                InkWell(
+                  onTap: () async {
+                    final imagePaths = await pickMultipleImagesFromGallery(context);
+                    if (imagePaths != null && imagePaths.isNotEmpty) {
+                      Navigator.pop(context, 'multiple:${imagePaths.join(",")}');
+                    } else {
+                      Navigator.pop(context);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.purple, width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Column(
+                      children: [
+                        Icon(Icons.photo_library, size: 40, color: Colors.purple),
+                        SizedBox(height: 8),
+                        Text('Múltiplas Fotos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.purple)),
+                        Text('Selecionar várias fotos da galeria', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<bool> deleteMultiplePhotos(List<String> photoPaths) async {
+    bool allDeleted = true;
+    
+    for (String photoPath in photoPaths) {
+      bool deleted = await deletePhoto(photoPath);
+      if (!deleted) allDeleted = false;
+    }
+    
+    return allDeleted;
+  }
 }
