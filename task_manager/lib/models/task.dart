@@ -62,92 +62,108 @@ class Task {
   bool get wasCompletedByShake => completedBy == 'shake';
 
   Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'title': title,
-      'description': description,
-      'completed': completed ? 1 : 0,
-      'priority': priority,
-      'createdAt': createdAt.toIso8601String(),
-      'dueDate': dueDate?.toIso8601String(),
-      'photoPath': photoPath,
-      'photoPaths': photoPaths?.join(','), // Salva como string separada por vírgulas
-      'completedAt': completedAt?.toIso8601String(),
-      'completedBy': completedBy,
-      'latitude': latitude,
-      'longitude': longitude,
-      'locationName': locationName,
-      'lastModified': lastModified.toIso8601String(),
-      'isSynced': isSynced ? 1 : 0,
-      'syncAction': syncAction,
-    };
-  }
+  return {
+    'id': id,
+    'title': title,
+    'description': description,
+    'priority': priority,
+    'completed': completed == true ? 1 : 0,          // bool → int
+    'createdAt': createdAt?.toIso8601String(),
+    'photoPath': photoPath,
+    'photoPaths': (photoPaths ?? []).join(','),
+
+    'completedAt': completedAt?.toIso8601String(),
+    'completedBy': completedBy,
+
+    'latitude': latitude,
+    'longitude': longitude,
+    'locationName': locationName,
+
+    'dueDate': dueDate?.toIso8601String(),
+
+    'lastModified': lastModified?.toIso8601String(), // DateTime → String
+
+    'isSynced': isSynced == true ? 1 : 0,            // bool → int
+
+    'syncAction': syncAction,
+  };
+}
+
 
   factory Task.fromMap(Map<String, dynamic> map) {
-    return Task(
-      id: map['id'] as int?,
-      title: map['title'] as String,
-      description: map['description'] as String,
-      priority: map['priority'] as String,
-      completed: (map['completed'] as int) == 1,
-      createdAt: DateTime.parse(map['createdAt'] as String),
-      photoPath: map['photoPath'] as String?,
-      photoPaths: map['photoPaths'] != null 
-          ? (map['photoPaths'] as String).split(',').where((path) => path.isNotEmpty).toList()
-          : null,
-      completedAt: map['completedAt'] != null
-          ? DateTime.parse(map['completedAt'] as String)
-          : null,
-      completedBy: map['completedBy'] as String?,
-      latitude: map['latitude'] as double?,
-      longitude: map['longitude'] as double?,
-      locationName: map['locationName'] as String?,
-      dueDate: map['dueDate'] != null ? DateTime.parse(map['dueDate']) : null,
-      lastModified: DateTime.parse(map['lastModified']),
-      isSynced: (map['isSynced'] ?? 1) == 1,
-      syncAction: map['syncAction'],
-    );
-  }
+  return Task(
+    id: map['id'] as int?,
+    title: map['title'] ?? '',
+    description: map['description'] ?? '',
+    priority: map['priority'] ?? '',
+    completed: (map['completed'] ?? 0) == 1,           // int → bool
+    createdAt: DateTime.tryParse(map['createdAt'] ?? ''),
+    photoPath: map['photoPath'],
+    photoPaths: map['photoPaths'] != null
+        ? List<String>.from(map['photoPaths'].split(','))
+        : [],
+    completedAt: map['completedAt'] != null
+        ? DateTime.tryParse(map['completedAt'])
+        : null,
+    completedBy: map['completedBy'],
+    latitude: map['latitude'] != null ? map['latitude'] * 1.0 : null,
+    longitude: map['longitude'] != null ? map['longitude'] * 1.0 : null,
+    locationName: map['locationName'],
+    dueDate: map['dueDate'] != null
+        ? DateTime.tryParse(map['dueDate'])
+        : null,
+
+    lastModified: map['lastModified'] != null
+        ? DateTime.tryParse(map['lastModified'])
+        : null,                                    // String → DateTime
+
+    isSynced: map['isSynced'] == 1,                // int → bool
+
+    syncAction: map['syncAction'],
+  );
+}
+
 
   Task copyWith({
-    int? id,
-    String? title,
-    String? description,
-    bool? completed,
-    String? priority,
-    DateTime? dueDate,
-    DateTime? createdAt,
-    String? photoPath,
-    List<String>? photoPaths,
-    DateTime? completedAt,
-    String? completedBy,
-    double? latitude,
-    double? longitude,
-    String? locationName,
-    DateTime? lastModified,
-    bool? isSynced,
-    String? syncAction,
-  }) {
-    return Task(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      completed: completed ?? this.completed,
-      priority: priority ?? this.priority,
-      createdAt: createdAt,
-      dueDate: dueDate ?? this.dueDate,
-      photoPath: photoPath ?? this.photoPath,
-      photoPaths: photoPaths ?? this.photoPaths,
-      completedAt: completedAt ?? this.completedAt,
-      completedBy: completedBy ?? this.completedBy,
-      latitude: latitude ?? this.latitude,
-      longitude: longitude ?? this.longitude,
-      locationName: locationName ?? this.locationName,
-      lastModified: lastModified ?? DateTime.now(), // marca alteração
-      isSynced: isSynced ?? this.isSynced,
-      syncAction: syncAction ?? this.syncAction,
-    );
-  }
+  int? id,
+  String? title,
+  String? description,
+  String? priority,
+  bool? completed,
+  DateTime? createdAt,
+  String? photoPath,
+  List<String>? photoPaths,
+  DateTime? completedAt,
+  String? completedBy,
+  double? latitude,
+  double? longitude,
+  String? locationName,
+  DateTime? dueDate,
+  DateTime? lastModified,
+  bool? isSynced,
+  String? syncAction,
+}) {
+  return Task(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    description: description ?? this.description,
+    priority: priority ?? this.priority,
+    completed: completed ?? this.completed,
+    createdAt: createdAt ?? this.createdAt,
+    photoPath: photoPath ?? this.photoPath,
+    photoPaths: photoPaths ?? this.photoPaths,
+    completedAt: completedAt ?? this.completedAt,
+    completedBy: completedBy ?? this.completedBy,
+    latitude: latitude ?? this.latitude,
+    longitude: longitude ?? this.longitude,
+    locationName: locationName ?? this.locationName,
+    dueDate: dueDate ?? this.dueDate,
+    lastModified: lastModified ?? this.lastModified,
+    isSynced: isSynced ?? this.isSynced,
+    syncAction: syncAction ?? this.syncAction,
+  );
+}
+
 
   // Método para verificar se a tarefa está vencida
   bool get isOverdue {

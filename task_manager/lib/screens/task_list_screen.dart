@@ -1,4 +1,9 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:task_manager/services/connectivity_service.dart';
+import 'package:task_manager/services/sync_service.dart';
 import '../models/task.dart';
 import '../services/database_service.dart';
 import '../services/sensor_service.dart';
@@ -18,19 +23,41 @@ class _TaskListScreenState extends State<TaskListScreen> {
   List<Task> _tasks = [];
   String _filter = 'all'; // all, completed, pending, overdue
   bool _isLoading = false;
+  bool _isOnline = true;
+  late final StreamSubscription _connSub;
 
   @override
   void initState() {
     super.initState();
-    _loadTasks();
-    _setupShakeDetection(); // INICIAR SHAKE
+      super.initState();
+      _loadTasks();
+      _setupShakeDetection();
+      _listenConnectivity();
   }
 
+  void _listenConnectivity() {
+  _connSub = ConnectivityService.instance.onConnectivityChanged.listen((status) async {
+    final online = status != ConnectivityResult.none;
+
+    setState(() => _isOnline = online);
+
+    if (online) {
+      // quando voltar a internet → sincroniza
+      await SyncService.instance.processQueue();
+      await _loadTasks(); 
+    }
+  });
+}
+
+
   @override
-  void dispose() {
-    SensorService.instance.stop(); // PARAR SHAKE
+
+void dispose() {
+    SensorService.instance.stop();
+    _connSub.cancel();
     super.dispose();
-  }
+}
+
 
   // SHAKE DETECTION
   void _setupShakeDetection() {
@@ -416,6 +443,16 @@ class _TaskListScreenState extends State<TaskListScreen> {
       body: Column(
         children: [
           // Barra de Busca
+          if (true) Container(
+            width: double.infinity,
+            color: _isOnline ? Colors.green : Colors.red,
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              _isOnline ? '🟢 Modo Online' : '🔴 Modo Offline',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(

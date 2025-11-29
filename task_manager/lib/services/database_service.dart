@@ -21,25 +21,27 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 5, // NOVA VERSÃO PARA MÚLTIPLAS FOTOS
+      version: 7,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
   }
 
+  // ---------------------------------------------------------
+  // CREATE DATABASE
+  // ---------------------------------------------------------
   Future<void> _createDB(Database db, int version) async {
     const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
-    const textType = 'TEXT NOT NULL';
-    const intType = 'INTEGER NOT NULL';
+    const intType = 'INTEGER';
 
     await db.execute('''
       CREATE TABLE tasks (
         id $idType,
-        title $textType,
-        description $textType,
-        priority $textType,
-        completed $intType,
-        createdAt $textType,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        priority TEXT NOT NULL,
+        completed $intType NOT NULL,
+        createdAt TEXT NOT NULL,
         photoPath TEXT,
         photoPaths TEXT,
         completedAt TEXT,
@@ -47,13 +49,29 @@ class DatabaseService {
         latitude REAL,
         longitude REAL,
         locationName TEXT,
-        dueDate TEXT
+        dueDate TEXT,
+        lastModified TEXT NOT NULL,
+        isSynced INTEGER NOT NULL DEFAULT 0,
+        syncAction TEXT
+      )
+    ''');
+
+    // Tabela da fila de sincronização
+    await db.execute('''
+      CREATE TABLE sync_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        taskId INTEGER,
+        action TEXT NOT NULL, 
+        payload TEXT NOT NULL, 
+        timestamp TEXT NOT NULL
       )
     ''');
   }
 
+  // ---------------------------------------------------------
+  // UPGRADE DATABASE (MIGRAÇÕES)
+  // ---------------------------------------------------------
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Migração incremental para cada versão
     if (oldVersion < 2) {
       await db.execute('ALTER TABLE tasks ADD COLUMN photoPath TEXT');
     }
@@ -69,49 +87,100 @@ class DatabaseService {
     if (oldVersion < 5) {
       await db.execute('ALTER TABLE tasks ADD COLUMN photoPaths TEXT');
     }
-    print('✅ Banco migrado de v$oldVersion para v$newVersion');
+    if (oldVersion < 6) {
+      await db.execute('ALTER TABLE tasks ADD COLUMN lastModified TEXT');
+      await db.execute(
+        'ALTER TABLE tasks ADD COLUMN isSynced INTEGER DEFAULT 1',
+      );
+      await db.execute('ALTER TABLE tasks ADD COLUMN syncAction TEXT');
+    }
+    if (oldVersion < 7) {
+      await db.execute('''
+        CREATE TABLE sync_queue (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          taskId INTEGER,
+          action TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          timestamp TEXT NOT NULL
+        )
+      ''');
+    }
+
+    print("✅ Migrado de $oldVersion para $newVersion");
   }
 
-  // CRUD Methods
+  // ---------------------------------------------------------
+  // CRUD METHODS COM PRONTO PARA SYNC
+  // ---------------------------------------------------------
+
+  // CREATE
   Future<Task> create(Task task) async {
     final db = await instance.database;
-    final id = await db.insert('tasks', task.toMap());
+
+    final now = DateTime.now();
+
+    final data = task
+        .copyWith(lastModified: now, isSynced: false, syncAction: 'create')
+        .toMap();
+
+    final id = await db.insert('tasks', data);
+
     return task.copyWith(id: id);
   }
 
+  // READ
   Future<Task?> read(int id) async {
     final db = await instance.database;
     final maps = await db.query('tasks', where: 'id = ?', whereArgs: [id]);
 
-    if (maps.isNotEmpty) {
-      return Task.fromMap(maps.first);
-    }
+    if (maps.isNotEmpty) return Task.fromMap(maps.first);
     return null;
   }
 
+  // READ ALL
   Future<List<Task>> readAll() async {
-    final db = await database;
-    const orderBy = 'createdAt DESC';
-    final result = await db.query('tasks', orderBy: orderBy);
+    final db = await instance.database;
+    final result = await db.query('tasks', orderBy: 'createdAt DESC');
     return result.map((map) => Task.fromMap(map)).toList();
   }
 
+  // UPDATE
   Future<int> update(Task task) async {
     final db = await instance.database;
+
+    final now = DateTime.now();
+
     return db.update(
       'tasks',
-      task.toMap(),
+      task
+          .copyWith(lastModified: now, isSynced: false, syncAction: 'update')
+          .toMap(),
       where: 'id = ?',
       whereArgs: [task.id],
     );
   }
 
+  // DELETE
   Future<int> delete(int id) async {
     final db = await instance.database;
-    return await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
+
+    // Marca como "delete" para sync
+    return db.update(
+      'tasks',
+      {
+        'isSynced': 0,
+        'syncAction': 'delete',
+        'lastModified': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
-  // Buscar tarefas ordenadas por data de vencimento
+  // ---------------------------------------------------------
+  // CONSULTAS ESPECIAIS
+  // ---------------------------------------------------------
+
   Future<List<Task>> readAllOrderedByDueDate() async {
     final db = await database;
     const orderBy = 'dueDate IS NULL, dueDate ASC, createdAt DESC';
@@ -119,10 +188,9 @@ class DatabaseService {
     return result.map((map) => Task.fromMap(map)).toList();
   }
 
-  // Buscar tarefas vencidas
   Future<List<Task>> readOverdueTasks() async {
     final db = await database;
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now();
     final result = await db.query(
       'tasks',
       where: 'dueDate IS NOT NULL AND dueDate < ? AND completed = 0',
@@ -132,16 +200,16 @@ class DatabaseService {
     return result.map((map) => Task.fromMap(map)).toList();
   }
 
-  // Buscar tarefas que vencem hoje
   Future<List<Task>> readTasksDueToday() async {
     final db = await database;
+
     final today = DateTime.now();
-    final startOfDay = DateTime(
+    final start = DateTime(
       today.year,
       today.month,
       today.day,
     ).toIso8601String();
-    final endOfDay = DateTime(
+    final end = DateTime(
       today.year,
       today.month,
       today.day,
@@ -153,32 +221,118 @@ class DatabaseService {
     final result = await db.query(
       'tasks',
       where: 'dueDate >= ? AND dueDate <= ? AND completed = 0',
-      whereArgs: [startOfDay, endOfDay],
+      whereArgs: [start, end],
       orderBy: 'dueDate ASC',
     );
+
     return result.map((map) => Task.fromMap(map)).toList();
   }
 
-  // Método especial: buscar tarefas por proximidade
   Future<List<Task>> getTasksNearLocation({
     required double latitude,
     required double longitude,
     double radiusInMeters = 1000,
   }) async {
-    final allTasks = await readAll();
+    final all = await readAll();
 
-    return allTasks.where((task) {
-      if (!task.hasLocation) return false;
+    return all.where((t) {
+      if (!t.hasLocation) return false;
 
-      // Cálculo de distância usando fórmula de Haversine (simplificada)
-      final latDiff = (task.latitude! - latitude).abs();
-      final lonDiff = (task.longitude! - longitude).abs();
+      final latDiff = (t.latitude! - latitude).abs();
+      final lonDiff = (t.longitude! - longitude).abs();
       final distance = ((latDiff * 111000) + (lonDiff * 111000)) / 2;
 
       return distance <= radiusInMeters;
     }).toList();
   }
 
+  Future<void> insertSyncAction({
+    required int? taskId,
+    required String action,
+    required String payload,
+  }) async {
+    final db = await database;
+    await db.insert('sync_queue', {
+      'taskId': taskId,
+      'action': action, // create, update, delete
+      'payload': payload, // JSON da task
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getSyncQueue() async {
+    final db = await database;
+    return await db.query('sync_queue', orderBy: 'timestamp ASC');
+  }
+
+  Future<void> clearSyncQueue() async {
+    final db = await database;
+    await db.delete('sync_queue');
+  }
+
+  // UPDATE OR INSERT (local change)
+  Future<void> upsert(Task task) async {
+    final db = await instance.database;
+    final now = DateTime.now();
+
+    final data = task.copyWith(lastModified: now, isSynced: false).toMap();
+
+    if (task.id == null) {
+      await db.insert('tasks', data);
+    } else {
+      await db.update('tasks', data, where: 'id = ?', whereArgs: [task.id]);
+    }
+  }
+
+  // UPSERT COM DADOS DO SERVIDOR (LWW)
+  Future<void> upsertFromServer(Task incoming) async {
+    final db = await instance.database;
+
+    // Sempre garantir que venha como sincronizado
+    Task serverTask = incoming.copyWith(isSynced: true, syncAction: null);
+
+    if (serverTask.id == null) {
+      // Se não há id, só insere
+      await db.insert('tasks', serverTask.toMap());
+      return;
+    }
+
+    final existingMap = await db.query(
+      'tasks',
+      where: 'id = ?',
+      whereArgs: [serverTask.id],
+      limit: 1,
+    );
+
+    if (existingMap.isEmpty) {
+      await db.insert('tasks', serverTask.toMap());
+      return;
+    }
+
+    final existing = Task.fromMap(existingMap.first);
+
+    final incomingTs = serverTask.lastModified; // non-nullable
+    final existingTs = existing.lastModified; // non-nullable
+
+    // Last-Write-Wins: aplica se versão do servidor é mais nova
+    if (incomingTs.isAfter(existingTs)) {
+      await db.update(
+        'tasks',
+        serverTask.toMap(),
+        where: 'id = ?',
+        whereArgs: [serverTask.id],
+      );
+    }
+  }
+
+  Future<void> removeSyncAction(int id) async {
+    final db = await instance.database;
+    await db.delete('sync_queue', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ---------------------------------------------------------
+  // CLOSE
+  // ---------------------------------------------------------
   Future close() async {
     final db = await instance.database;
     db.close();
