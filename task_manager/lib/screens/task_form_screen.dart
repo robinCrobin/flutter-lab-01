@@ -188,6 +188,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         // Persist locally and get id
         final created = await DatabaseService.instance.create(newTask);
         // Queue with the created task (has id)
+        debugPrint('Cheguei até aqui: tarefa criada -> ${created.toString()}');
         await SyncService.instance.registerLocalChange(created, 'create');
 
         if (mounted) {

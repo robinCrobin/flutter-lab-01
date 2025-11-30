@@ -24,6 +24,7 @@ class SyncService {
   /// Registra mudança local e coloca na fila
   Future<void> registerLocalChange(Task task, String action) async {
     // aplica alteração local com marca de sync pendente
+    print('cheguei aqui: taskId=${task.id}, action=$action');
     await DatabaseService.instance.upsert(task.copyWith(syncAction: action, isSynced: false));
     // adiciona na fila
     await queueAction(taskId: task.id!, action: action, task: task);

@@ -7,7 +7,7 @@ class TaskApiService {
   static final TaskApiService instance = TaskApiService._();
 
   // Base URL da API - ajuste conforme seu backend
-  final String baseUrl = 'https://example.com/api';
+  final String baseUrl = "http://10.0.2.2:3000";
 
   Future<List<Task>> fetchAllSince(DateTime since) async {
     final uri = Uri.parse('$baseUrl/tasks?since=${since.toUtc().toIso8601String()}');
@@ -18,6 +18,8 @@ class TaskApiService {
   }
 
   Future<Task> create(Task task) async {
+    // Debug: print task payload before sending
+    print('create() received task: ${jsonEncode(task.toMap())}');
     final uri = Uri.parse('$baseUrl/tasks');
     final resp = await http.post(uri,
         headers: {'Content-Type': 'application/json'},
