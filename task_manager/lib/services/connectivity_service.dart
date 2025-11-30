@@ -13,4 +13,10 @@ class ConnectivityService {
     final result = await _connectivity.checkConnectivity();
     return result != ConnectivityResult.none;
   }
+
+  Stream<bool> get online$ => onConnectivityChanged.map((r) => r != ConnectivityResult.none).distinct();
+
+  void listenOnlineChanges(void Function(bool online) handler) {
+    online$.listen(handler);
+  }
 }
