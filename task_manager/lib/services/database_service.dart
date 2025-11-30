@@ -126,16 +126,10 @@ class DatabaseService {
   // CREATE
   Future<Task> create(Task task) async {
     final db = await instance.database;
-
-    final now = DateTime.now();
-
-    final data = task
-        .copyWith(lastModified: now, isSynced: false, syncAction: 'create')
-        .toMap();
-
+    final now = DateTime.now().toUtc();
+    final data = task.copyWith(lastModified: now, isSynced: false, syncAction: 'create').toMap();
     final id = await db.insert('tasks', data);
-
-    return task.copyWith(id: id);
+    return task.copyWith(id: id, lastModified: now, isSynced: false, syncAction: 'create');
   }
 
   // READ
@@ -161,9 +155,7 @@ class DatabaseService {
   // UPDATE
   Future<int> update(Task task) async {
     final db = await instance.database;
-
-    final now = DateTime.now();
-
+    final now = DateTime.now().toUtc();
     return db.update(
       'tasks',
       task
@@ -293,10 +285,8 @@ class DatabaseService {
   // UPDATE OR INSERT (local change)
   Future<void> upsert(Task task) async {
     final db = await instance.database;
-    final now = DateTime.now();
-
+    final now = DateTime.now().toUtc();
     final data = task.copyWith(lastModified: now, isSynced: false).toMap();
-
     if (task.id == null) {
       await db.insert('tasks', data);
     } else {

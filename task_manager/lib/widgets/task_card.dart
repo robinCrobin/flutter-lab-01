@@ -92,6 +92,25 @@ class TaskCard extends StatelessWidget {
     return dateFormat.format(dueDate);
   }
 
+  Widget _syncStatusIcon() {
+    if (task.deleted) {
+      return const Tooltip(
+        message: 'Removida (aguardando sync)',
+        child: Icon(Icons.delete_forever, size: 18, color: Colors.redAccent),
+      );
+    }
+    if (!task.isSynced) {
+      return const Tooltip(
+        message: 'Pendente de sincronização',
+        child: Icon(Icons.cloud_off, size: 18, color: Colors.orange),
+      );
+    }
+    return const Tooltip(
+      message: 'Sincronizada',
+      child: Icon(Icons.cloud_done, size: 18, color: Colors.green),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
@@ -161,6 +180,22 @@ class TaskCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
+
+                    const SizedBox(height: 8),
+
+                    // Sync Status Row
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _syncStatusIcon(),
+                        const SizedBox(width: 6),
+                        if (task.syncAction != null && !task.isSynced)
+                          Text(
+                            task.syncAction!,
+                            style: const TextStyle(fontSize: 10, color: Colors.orange),
+                          ),
+                      ],
+                    ),
 
                     const SizedBox(height: 8),
 

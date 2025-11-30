@@ -36,19 +36,15 @@ class _TaskListScreenState extends State<TaskListScreen> {
   }
 
   void _listenConnectivity() {
-  _connSub = ConnectivityService.instance.onConnectivityChanged.listen((status) async {
-    final online = status != ConnectivityResult.none;
-
-    setState(() => _isOnline = online);
-
-    if (online) {
-      // quando voltar a internet → sincroniza
-      await SyncService.instance.processQueue();
-      await _loadTasks(); 
-    }
-  });
-}
-
+    _connSub = ConnectivityService.instance.onConnectivityChanged.listen((status) async {
+      final online = status != ConnectivityResult.none;
+      setState(() => _isOnline = online);
+      if (online) {
+        await SyncService.instance.sync();
+        await _loadTasks();
+      }
+    });
+  }
 
   @override
 
@@ -240,7 +236,7 @@ void dispose() {
 
   Future<void> _toggleTask(Task task) async {
     final updated = task.copyWith(completed: !task.completed);
-    await DatabaseService.instance.update(updated);
+    await SyncService.instance.registerLocalChange(updated, 'update');
     await _loadTasks();
   }
 
@@ -305,8 +301,8 @@ void dispose() {
         if (task.hasPhoto) {
           await CameraService.instance.deletePhoto(task.photoPath!);
         }
-
-        await DatabaseService.instance.delete(task.id!);
+        final tombstone = task.copyWith(deleted: true);
+        await SyncService.instance.registerLocalChange(tombstone, 'delete');
         await _loadTasks();
 
         if (mounted) {

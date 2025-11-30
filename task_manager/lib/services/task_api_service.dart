@@ -30,7 +30,10 @@ class TaskApiService {
     if (task.id == null) throw Exception('Task sem id');
     final uri = Uri.parse('$baseUrl/tasks/${task.id}');
     final resp = await http.put(uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'If-Unmodified-Since': task.serverUpdatedAt?.toUtc().toIso8601String() ?? '',
+        },
         body: jsonEncode(task.toMap()));
     if (resp.statusCode != 200) throw Exception('Erro ao atualizar task');
     return Task.fromMap(jsonDecode(resp.body));

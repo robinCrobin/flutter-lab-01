@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import '../models/task.dart';
 import '../services/database_service.dart';
@@ -6,6 +5,7 @@ import '../services/camera_service.dart';
 import '../services/location_service.dart';
 import '../widgets/location_picker.dart';
 import '../widgets/photo_gallery_widget.dart';
+import '../services/sync_service.dart';
 
 class TaskFormScreen extends StatefulWidget {
   final Task? task; // null = criar novo, não-null = editar
@@ -171,7 +171,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
     try {
       if (widget.task == null) {
-        // Criar nova tarefa
         final newTask = Task(
           title: _titleController.text.trim(),
           description: _descriptionController.text.trim(),
@@ -183,8 +182,11 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           latitude: _latitude,
           longitude: _longitude,
           locationName: _locationName,
+          isSynced: false,
+          syncAction: 'create',
         );
         await DatabaseService.instance.create(newTask);
+        await SyncService.instance.registerLocalChange(newTask.copyWith(), 'create');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -196,7 +198,6 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           );
         }
       } else {
-        // Atualizar tarefa existente
         final updatedTask = widget.task!.copyWith(
           title: _titleController.text.trim(),
           description: _descriptionController.text.trim(),
@@ -210,6 +211,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           locationName: _locationName,
         );
         await DatabaseService.instance.update(updatedTask);
+        await SyncService.instance.registerLocalChange(updatedTask, 'update');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -1,3 +1,5 @@
+import 'package:uuid/uuid.dart';
+
 class Task {
   final int? id;
   final String title;
@@ -28,8 +30,7 @@ class Task {
   // OFFLINE-FIRST
   final DateTime? serverUpdatedAt; // timestamp do servidor
   final bool deleted; // tombstone
-  final String?
-  deviceId; // identificador do dispositivo que gerou a última mudança
+  String? deviceId; // identificador do dispositivo que gerou a última mudança
 
   Task({
     this.id,
@@ -52,8 +53,10 @@ class Task {
     this.serverUpdatedAt,
     this.deleted = false,
     this.deviceId,
-  }) : createdAt = createdAt ?? DateTime.now(),
-       lastModified = lastModified ?? DateTime.now();
+  }) : createdAt = (createdAt ?? DateTime.now()).toUtc(),
+       lastModified = (lastModified ?? DateTime.now()).toUtc() {
+    deviceId = deviceId ?? const Uuid().v4();
+  }
 
   // Getters auxiliares
   bool get hasPhoto =>
