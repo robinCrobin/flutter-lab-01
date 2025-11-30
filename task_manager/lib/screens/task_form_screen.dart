@@ -48,12 +48,12 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       _dueDate = widget.task!.dueDate;
       _photoPath = widget.task!.photoPath;
       _photoPaths = List<String>.from(widget.task!.photoPaths ?? []);
-      
+
       // Ensure backward compatibility: if we have photoPath but no photoPaths, add it
       if (_photoPath != null && _photoPaths.isEmpty) {
         _photoPaths.add(_photoPath!);
       }
-      
+
       // Ensure photoPath is synced with photoPaths for backward compatibility
       if (_photoPaths.isNotEmpty && _photoPath == null) {
         _photoPath = _photoPaths.first;
@@ -73,7 +73,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
   // CÂMERA E GALERIA METHODS - Múltiplas fotos
   Future<void> _selectImages() async {
-    final result = await CameraService.instance.showMultiImageSourceDialog(context);
+    final result = await CameraService.instance.showMultiImageSourceDialog(
+      context,
+    );
 
     if (result != null && mounted) {
       if (result.startsWith('single:')) {
@@ -116,12 +118,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       _photoPaths.clear();
       _photoPath = null;
     });
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('🗑️ Todas as fotos removidas')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('🗑️ Todas as fotos removidas')),
+    );
   }
-
-
 
   // GPS METHODS
   void _showLocationPicker() {
@@ -185,8 +185,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           isSynced: false,
           syncAction: 'create',
         );
-        await DatabaseService.instance.create(newTask);
-        await SyncService.instance.registerLocalChange(newTask.copyWith(), 'create');
+        // Persist locally and get id
+        final created = await DatabaseService.instance.create(newTask);
+        // Queue with the created task (has id)
+        await SyncService.instance.registerLocalChange(created, 'create');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -500,9 +502,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                         const Icon(Icons.photo_library, color: Colors.blue),
                         const SizedBox(width: 8),
                         Text(
-                          _photoPaths.isEmpty 
-                            ? 'Fotos'
-                            : 'Fotos (${_photoPaths.length})',
+                          _photoPaths.isEmpty
+                              ? 'Fotos'
+                              : 'Fotos (${_photoPaths.length})',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

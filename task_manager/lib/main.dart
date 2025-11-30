@@ -55,7 +55,10 @@ class MyApp extends StatelessWidget {
                   child: Text(
                     online ? 'Modo Online' : 'Modo Offline',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const Expanded(child: TaskListScreen()),
