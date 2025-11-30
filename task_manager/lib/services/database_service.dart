@@ -21,7 +21,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 7,
+      version: 8, // bump version for new columns
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -52,7 +52,10 @@ class DatabaseService {
         dueDate TEXT,
         lastModified TEXT NOT NULL,
         isSynced INTEGER NOT NULL DEFAULT 0,
-        syncAction TEXT
+        syncAction TEXT,
+        serverUpdatedAt TEXT,
+        deleted INTEGER NOT NULL DEFAULT 0,
+        deviceId TEXT
       )
     ''');
 
@@ -105,6 +108,13 @@ class DatabaseService {
         )
       ''');
     }
+    if (oldVersion < 8) {
+      await db.execute('ALTER TABLE tasks ADD COLUMN serverUpdatedAt TEXT');
+      await db.execute(
+        'ALTER TABLE tasks ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0',
+      );
+      await db.execute('ALTER TABLE tasks ADD COLUMN deviceId TEXT');
+    }
 
     print("✅ Migrado de $oldVersion para $newVersion");
   }
@@ -140,7 +150,11 @@ class DatabaseService {
   // READ ALL
   Future<List<Task>> readAll() async {
     final db = await instance.database;
-    final result = await db.query('tasks', orderBy: 'createdAt DESC');
+    final result = await db.query(
+      'tasks',
+      where: 'deleted = 0',
+      orderBy: 'createdAt DESC',
+    );
     return result.map((map) => Task.fromMap(map)).toList();
   }
 
@@ -170,7 +184,8 @@ class DatabaseService {
       {
         'isSynced': 0,
         'syncAction': 'delete',
-        'lastModified': DateTime.now().toIso8601String(),
+        'lastModified': DateTime.now().toUtc().toIso8601String(),
+        'deleted': 1,
       },
       where: 'id = ?',
       whereArgs: [id],
@@ -184,17 +199,22 @@ class DatabaseService {
   Future<List<Task>> readAllOrderedByDueDate() async {
     final db = await database;
     const orderBy = 'dueDate IS NULL, dueDate ASC, createdAt DESC';
-    final result = await db.query('tasks', orderBy: orderBy);
+    final result = await db.query(
+      'tasks',
+      where: 'deleted = 0',
+      orderBy: orderBy,
+    );
     return result.map((map) => Task.fromMap(map)).toList();
   }
 
   Future<List<Task>> readOverdueTasks() async {
     final db = await database;
-    final now = DateTime.now();
+    final nowIso = DateTime.now().toIso8601String();
     final result = await db.query(
       'tasks',
-      where: 'dueDate IS NOT NULL AND dueDate < ? AND completed = 0',
-      whereArgs: [now],
+      where:
+          'dueDate IS NOT NULL AND dueDate < ? AND completed = 0 AND deleted = 0',
+      whereArgs: [nowIso],
       orderBy: 'dueDate ASC',
     );
     return result.map((map) => Task.fromMap(map)).toList();
@@ -220,7 +240,7 @@ class DatabaseService {
 
     final result = await db.query(
       'tasks',
-      where: 'dueDate >= ? AND dueDate <= ? AND completed = 0',
+      where: 'dueDate >= ? AND dueDate <= ? AND completed = 0 AND deleted = 0',
       whereArgs: [start, end],
       orderBy: 'dueDate ASC',
     );
@@ -323,6 +343,21 @@ class DatabaseService {
         whereArgs: [serverTask.id],
       );
     }
+  }
+
+  Future<void> markDeletedLocal(int id) async {
+    final db = await instance.database;
+    await db.update(
+      'tasks',
+      {
+        'deleted': 1,
+        'isSynced': 0,
+        'syncAction': 'delete',
+        'lastModified': DateTime.now().toUtc().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> removeSyncAction(int id) async {
