@@ -342,12 +342,16 @@ class TaskCard extends StatelessWidget {
                                   color: Colors.green,
                                 ),
                                 const SizedBox(width: 4),
-                                Text(
-                                  task.locationName ?? 'Localização',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.bold,
+                                Flexible(
+                                  child: Text(
+                                    task.locationName ?? 'Localização',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ],

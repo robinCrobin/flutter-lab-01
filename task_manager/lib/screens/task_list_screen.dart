@@ -377,7 +377,13 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   children: [
                     Icon(Icons.list_alt),
                     SizedBox(width: 8),
-                    Text('Todas'),
+                    Expanded(
+                      child: Text(
+                        'Todas',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -387,7 +393,13 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   children: [
                     Icon(Icons.pending_outlined),
                     SizedBox(width: 8),
-                    Text('Pendentes'),
+                    Expanded(
+                      child: Text(
+                        'Pendentes',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -397,7 +409,13 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   children: [
                     Icon(Icons.check_circle_outline),
                     SizedBox(width: 8),
-                    Text('Concluídas'),
+                    Expanded(
+                      child: Text(
+                        'Concluídas',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -407,7 +425,13 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   children: [
                     Icon(Icons.near_me),
                     SizedBox(width: 8),
-                    Text('Próximas'),
+                    Expanded(
+                      child: Text(
+                        'Próximas',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
