@@ -29,14 +29,16 @@ class _TaskListScreenState extends State<TaskListScreen> {
   @override
   void initState() {
     super.initState();
-      super.initState();
-      _loadTasks();
-      _setupShakeDetection();
-      _listenConnectivity();
+    super.initState();
+    _loadTasks();
+    _setupShakeDetection();
+    _listenConnectivity();
   }
 
   void _listenConnectivity() {
-    _connSub = ConnectivityService.instance.onConnectivityChanged.listen((status) async {
+    _connSub = ConnectivityService.instance.onConnectivityChanged.listen((
+      status,
+    ) async {
       final online = status != ConnectivityResult.none;
       setState(() => _isOnline = online);
       if (online) {
@@ -47,13 +49,11 @@ class _TaskListScreenState extends State<TaskListScreen> {
   }
 
   @override
-
-void dispose() {
+  void dispose() {
     SensorService.instance.stop();
     _connSub.cancel();
     super.dispose();
-}
-
+  }
 
   // SHAKE DETECTION
   void _setupShakeDetection() {
@@ -299,10 +299,22 @@ void dispose() {
     if (confirm == true) {
       try {
         if (task.hasPhoto) {
-          await CameraService.instance.deletePhoto(task.photoPath!);
+          // Delete all associated photos safely (handles single and multiple)
+          await CameraService.instance.deleteMultiplePhotos(task.allPhotoPaths);
         }
-        final tombstone = task.copyWith(deleted: true);
-        await SyncService.instance.registerLocalChange(tombstone, 'delete');
+
+        // Marca como deletada no banco e adiciona à fila de sync
+        if (task.id != null) {
+          await DatabaseService.instance.delete(task.id!);
+          await SyncService.instance.queueAction(
+            taskId: task.id!,
+            action: 'delete',
+            task: task.copyWith(deleted: true),
+          );
+        } else {
+          throw Exception('Task sem id');
+        }
+
         await _loadTasks();
 
         if (mounted) {
@@ -439,16 +451,17 @@ void dispose() {
       body: Column(
         children: [
           // Barra de Busca
-          if (true) Container(
-            width: double.infinity,
-            color: _isOnline ? Colors.green : Colors.red,
-            padding: const EdgeInsets.all(8),
-            child: Text(
-              _isOnline ? '🟢 Modo Online' : '🔴 Modo Offline',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white),
+          if (true)
+            Container(
+              width: double.infinity,
+              color: _isOnline ? Colors.green : Colors.red,
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                _isOnline ? '🟢 Modo Online' : '🔴 Modo Offline',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white),
+              ),
             ),
-          ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
