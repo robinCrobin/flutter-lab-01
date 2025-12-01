@@ -80,6 +80,10 @@ class SyncService {
         switch (action) {
           case 'create':
             final created = await TaskApiService.instance.create(task);
+            if (created.id != task.id && task.id != null) {
+              // Replace local record to avoid duplicate ids
+              await DatabaseService.instance.delete(task.id!);
+            }
             await DatabaseService.instance.upsertFromServer(created);
             break;
           case 'update':

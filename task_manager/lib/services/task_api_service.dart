@@ -62,6 +62,7 @@ class TaskApiService {
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
+        'id': task.id, // manter id local
         'title': task.title,
         'description': task.description,
         // Opcionalmente, envie lastModified se quiser
