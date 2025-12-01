@@ -23,16 +23,25 @@ class _TaskListScreenState extends State<TaskListScreen> {
   List<Task> _tasks = [];
   String _filter = 'all'; // all, completed, pending, overdue
   bool _isLoading = false;
-  bool _isOnline = true;
+  bool _isOnline = false; // inicia como offline até checar
   late final StreamSubscription _connSub;
 
   @override
   void initState() {
     super.initState();
-    super.initState();
-    _loadTasks();
     _setupShakeDetection();
     _listenConnectivity();
+    _setInitialConnectivity();
+    _loadTasks();
+  }
+
+  Future<void> _setInitialConnectivity() async {
+    final online = await ConnectivityService.instance.isOnline;
+    if (mounted) setState(() => _isOnline = online);
+    if (online) {
+      await SyncService.instance.sync();
+      await _loadTasks();
+    }
   }
 
   void _listenConnectivity() {

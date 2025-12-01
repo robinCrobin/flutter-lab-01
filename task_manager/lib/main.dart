@@ -48,19 +48,6 @@ class MyApp extends StatelessWidget {
           home: Scaffold(
             body: Column(
               children: [
-                Container(
-                  width: double.infinity,
-                  color: online ? Colors.green : Colors.orange,
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Text(
-                    online ? 'Modo Online' : 'Modo Offline',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
                 const Expanded(child: TaskListScreen()),
               ],
             ),

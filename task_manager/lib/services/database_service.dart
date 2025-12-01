@@ -128,9 +128,14 @@ class DatabaseService {
   Future<Task> create(Task task) async {
     final db = await instance.database;
     final now = DateTime.now().toUtc();
-    final data = task.copyWith(lastModified: now, isSynced: false, syncAction: 'create').toMap();
+    // gera id temporário negativo se ainda não possui id
+    Task toInsert = task.id == null
+        ? task.copyWith(id: DateTime.now().millisecondsSinceEpoch * -1)
+        : task;
+    final data = toInsert.copyWith(lastModified: now, isSynced: false, syncAction: 'create').toMap();
     final id = await db.insert('tasks', data);
-    return task.copyWith(id: id, lastModified: now, isSynced: false, syncAction: 'create');
+    // O insert AUTOINCREMENT ignora id negativo custom? se sim usamos o retornado, senão mantemos
+    return toInsert.copyWith(id: id, lastModified: now, isSynced: false, syncAction: 'create');
   }
 
   // READ
@@ -354,6 +359,19 @@ class DatabaseService {
   Future<void> removeSyncAction(int id) async {
     final db = await instance.database;
     await db.delete('sync_queue', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> removeDuplicateUnsyncedCreates({
+    required int keepId,
+    required String title,
+    required String description,
+  }) async {
+    final db = await instance.database;
+    await db.delete(
+      'tasks',
+      where: 'id != ? AND title = ? AND description = ? AND syncAction = ? AND isSynced = 0',
+      whereArgs: [keepId, title, description, 'create'],
+    );
   }
 
   // ---------------------------------------------------------

@@ -7,6 +7,7 @@ import 'task_api_service.dart';
 class SyncService {
   SyncService._();
   static final SyncService instance = SyncService._();
+  bool _syncing = false; // evita sync concorrente
 
   /// Registra uma ação offline na tabela sync_queue
   Future<void> queueAction({
@@ -35,12 +36,21 @@ class SyncService {
   }
 
   Future<void> sync() async {
+    if (_syncing) {
+      // ignore: avoid_print
+      print('[SYNC] abort: already in progress');
+      return;
+    }
+    _syncing = true;
     // ignore: avoid_print
     print('[SYNC] start');
     final online = await ConnectivityService.instance.isOnline;
     // ignore: avoid_print
     print('[SYNC] online=$online');
-    if (!online) return;
+    if (!online) {
+      _syncing = false;
+      return;
+    }
 
     // PULL
     final localAll = await DatabaseService.instance.readAll();
@@ -85,6 +95,11 @@ class SyncService {
               await DatabaseService.instance.delete(task.id!);
             }
             await DatabaseService.instance.upsertFromServer(created);
+            await DatabaseService.instance.removeDuplicateUnsyncedCreates(
+              keepId: created.id!,
+              title: created.title,
+              description: created.description,
+            );
             break;
           case 'update':
             final updated = await TaskApiService.instance.update(task);
@@ -106,6 +121,7 @@ class SyncService {
     }
     // ignore: avoid_print
     print('[SYNC] done');
+    _syncing = false;
   }
 
   Future<void> clearQueue() async {

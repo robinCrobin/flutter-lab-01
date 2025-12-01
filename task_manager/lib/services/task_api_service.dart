@@ -55,19 +55,20 @@ class TaskApiService {
   }
 
   Future<Task> create(Task task) async {
-    // Debug: print task payload before sending
     print('create() received task: ${jsonEncode(task.toMap())}');
     final uri = Uri.parse('$baseUrl/tasks');
+    final body = {
+      'title': task.title,
+      'description': task.description,
+      'lastModified': task.lastModified.toUtc().toIso8601String(),
+    };
+    if (task.id != null && task.id! > 0) {
+      body['id'] = task.id!.toString(); // converte para string
+    }
     final resp = await http.post(
       uri,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'id': task.id, // manter id local
-        'title': task.title,
-        'description': task.description,
-        // Opcionalmente, envie lastModified se quiser
-        'lastModified': task.lastModified.toUtc().toIso8601String(),
-      }),
+      body: jsonEncode(body),
     );
     if (resp.statusCode != 201) throw Exception('Erro ao criar task');
     final map = jsonDecode(resp.body) as Map<String, dynamic>;
