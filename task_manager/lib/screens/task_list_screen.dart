@@ -438,6 +438,49 @@ class _TaskListScreenState extends State<TaskListScreen> {
             ],
           ),
           IconButton(
+            icon: const Icon(Icons.bug_report),
+            tooltip: 'Debug Sync',
+            onPressed: () async {
+              showModalBottomSheet(
+                context: context,
+                builder: (ctx) => SafeArea(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.clear_all),
+                        title: const Text('Limpar fila de sync'),
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          await SyncService.instance.clearQueue();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Fila de sync limpa')),
+                            );
+                          }
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.cloud_upload),
+                        title: const Text('Sync apenas creates'),
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          await SyncService.instance.syncCreatesOnly();
+                          await _loadTasks();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Sync (creates) concluído')),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () {
               showDialog(

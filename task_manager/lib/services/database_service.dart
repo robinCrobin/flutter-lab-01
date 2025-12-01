@@ -12,6 +12,7 @@ class DatabaseService {
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDB('tasks.db');
+    print('✅ Banco de dados inicializado');
     return _database!;
   }
 

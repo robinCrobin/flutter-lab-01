@@ -190,6 +190,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         // Queue with the created task (has id)
         debugPrint('Cheguei até aqui: tarefa criada -> ${created.toString()}');
         await SyncService.instance.registerLocalChange(created, 'create');
+        // Dispara sync imediato (se online)
+        await SyncService.instance.sync();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -215,6 +217,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         );
         await DatabaseService.instance.update(updatedTask);
         await SyncService.instance.registerLocalChange(updatedTask, 'update');
+        // Dispara sync imediato (se online)
+        await SyncService.instance.sync();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
